@@ -63,13 +63,34 @@
 <script>
 const csv = (url) => fetch(url).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.text();}).catch(()=>'');
 const rowToCell = (v,cls) => {const span=document.createElement('span');span.className=cls||'';span.textContent=v;return span};
+const parseCSV = (text) => {
+  const out = [];
+  let row = "", inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { row += '"'; i++; }
+        else inQuotes = false;
+      } else { row += c; }
+    } else {
+      if (c === '"') { inQuotes = true; }
+      else if (c === ",") { out.push(row); row = ""; }
+      else if (c.charCodeAt(0) === 10) { out.push(row); row = ""; }
+      else { row += c; }
+    }
+  }
+  out.push(row);
+  return out;
+};
+
 const render = (name,key,cid) => {
   const tbody = document.getElementById(cid); tbody.innerHTML='';
   csv('pin_ledger.csv').then(text=>{
     const lines=text.trim().split(/\r?\n/);
-    const hdr=lines[0].split(',');
+    const hdr=parseCSV(lines[0]);
     const idx={}; hdr.forEach((h,i)=>idx[h]=i);
-    const rows=lines.slice(1).map(l=>{const p=l.split(',');return {line:p,hdr};});
+    const rows=lines.slice(1).map(l=>{const p=parseCSV(l);return {line:p,hdr};});
     rows.forEach(r=>{
       const p=r.line;
       const imp = idx.impressions!==undefined? p[idx.impressions] : '';
