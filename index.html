@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Money Path — pin generator</title>
+<style>
+  :root{color-scheme:dark}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0b0d10;color:#e6eaed;padding:24px 16px;line-height:1.5}
+  h1{font-size:1.5rem;margin-bottom:2px}
+  .sub{color:#9aa4ad;font-size:.9rem;margin-bottom:18px}
+  .card{background:#11141a;border:1px solid #1f262e;border-radius:10px;padding:16px 18px;margin-bottom:16px}
+  .kicker{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:#7d8993;margin-bottom:8px}
+  table{width:100%;border-collapse:collapse;font-size:.82rem}
+  th,table td{border-bottom:1px solid #1f262e;padding:6px 8px;text-align:left;vertical-align:top}
+  th{color:#9aa4ad;text-transform:uppercase;letter-spacing:.04em;font-size:.7rem}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .blank{color:#b01818;font-weight:600}
+  .ok{color:#6cc071;font-weight:600}
+  .review{color:#ffcf5c;font-weight:600}
+  img.thumb{height:64px;width:64px;object-fit:cover;border-radius:4px;background:#1a2026}
+  .placeholder{height:64px;width:64px;background:#1a2026;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#4a5763;font-size:.65rem}
+  .badge{display:inline-block;font-size:.65rem;border:1px solid #2a3440;border-radius:6px;padding:1px 6px;color:#9aa4ad}
+  .note{background:#11141a;border:1px solid #2a3440;border-radius:8px;padding:12px 14px;font-size:.8rem;color:#b0b9c4}
+  a{color:#4fc0f0;text-decoration:none}
+  a:hover{text-decoration:underline}
+  .footer{margin-top:18px;color:#5a6675;font-size:.75rem}
+</style>
+</head>
+<body>
+<h1>Money Path — pin generator</h1>
+<p class="sub">Live status of the affiliate money path (run-it / AliExpress commission). Source: <code>pin_ledger.csv</code> + <code>pinterest.csv</code> in this repo.</p>
+
+<div class="card">
+  <div class="kicker">Status</div>
+  <p style="margin:4px 0"><span class="badge">site: published</span> Site root serves 200 on <code>tamyaharam-arch.github.io/</code>.</p>
+  <p style="margin:4px 0"><span class="badge">pin images: <span id="imgStatus" class="ok">served</span></span> 30 media URLs checked.</p>
+  <p style="margin:4px 0"><span class="badge">revenue loop: <span id="revStatus" class="review">unmeasured</span></span> <code>orders</code> / <code>commission_usd</code> are blank — needs the weekly AliExpress order-report fill.</p>
+</div>
+
+<div class="card">
+  <div class="kicker">Money path board <span class="note" style="display:inline;margin-left:8px">click a row to open the pin link</span></div>
+  <table>
+    <thead><tr>
+      <th>Pin</th><th>Title</th><th>Price</th><th>Clicks</th><th>Saves</th><th>Orders</th><th>Est. commission</th><th>Com. received</th>
+    </tr></thead>
+    <tbody id="board"></tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="kicker">Next steps</div>
+  <ul class="note" style="padding-left:18px">
+    <li>Fill <code>pin_ledger.csv</code> weekly: <code>impressions</code>, <code>outbound_clicks</code>, <code>saves</code> from Pinterest analytics; <code>orders</code>, <code>commission_usd</code> from your AliExpress Portals order report.</li>
+    <li>Re-run <code>py scripts/ledger_report.py</code> to get a measured EPC.</li>
+    <li>Keep <code>Link</code> values in sync with the current affiliate token (AliExpress).</li>
+  </ul>
+</div>
+
+<p class="footer">⚠️ 30 pin media URLs pointed at <code>tamyaharam-arch.github.io/pins/</code>, but <code>pins/</code> was empty in the repo when this page was built (2026-11-03). Upload <code>output/pins/</code> to <code>pins/</code> and push.</p>
+
+<script>
+const csv = (url) => fetch(url).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.text();}).catch(()=>'');
+const rowToCell = (v,cls) => {const span=document.createElement('span');span.className=cls||'';span.textContent=v;return span};
+const render = (name,key,cid) => {
+  const tbody = document.getElementById(cid); tbody.innerHTML='';
+  csv('pin_ledger.csv').then(text=>{
+    const lines=text.trim().split(/\r?\n/);
+    const hdr=lines[0].split(',');
+    const idx={}; hdr.forEach((h,i)=>idx[h]=i);
+    const rows=lines.slice(1).map(l=>{const p=l.split(',');return {line:p,hdr};});
+    rows.forEach(r=>{
+      const p=r.line;
+      const imp = idx.impressions!==undefined? p[idx.impressions] : '';
+      const oc = p[idx.outbound_clicks]||'';
+      const sv = p[idx.saves]||'';
+      const od = p[idx.orders]||'';
+      const ec = p[idx.est_commission_usd]||'';
+      const cc = p[idx.commission_usd]||'';
+      const blank = od==''||cc=='' ? '<span class="blank">EMPTY</span>' : rowToCell(od,'ok') + ' ' + rowToCell(cc,'ok');
+      const tr=document.createElement('tr');
+      tr.innerHTML = `<td>${r.line}</td>
+        <td>${esc(p[idx.title]||'')}</td>
+        <td class="num">${esc(p[idx.price]||'')}</td>
+        <td class="num">${esc(oc)}</td>
+        <td class="num">${esc(sv)}</td>
+        <td>${blank}</td>
+        <td class="num">${esc(ec)}</td>
+        <td class="num">${blank}</td>`;
+      tbody.appendChild(tr);
+    });
+  }).catch(()=>{const tr=document.createElement('tr');tr.colSpan=8;tr.textContent='(pin_ledger.csv not found — run the build first)';tbody.appendChild(tr);});
+};
+const esc=s=>(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+render();
+</script>
+</body>
+</html>
